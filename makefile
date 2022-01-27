@@ -1,5 +1,5 @@
-TARGET = template
-SRCS = template.s
+TARGET = main
+SRCS = src/main.S
 
 OBJS =  $(addsuffix .o, $(basename $(SRCS)))
 INCLUDES = -I.
@@ -95,11 +95,11 @@ burn:
 
 clean:
 	@echo "Cleaning..."
-	@$(RM_CMD) -f $(TARGET).elf
-	@$(RM_CMD) -f $(TARGET).bin
-	@$(RM_CMD) -f $(TARGET).map
-	@$(RM_CMD) -f $(TARGET).hex
-	@$(RM_CMD) -f $(TARGET).lst
-	@$(RM_CMD) -f $(TARGET).o
+	@$(RM_CMD) $(TARGET).elf
+	@$(RM_CMD) $(TARGET).bin
+	@$(RM_CMD) $(TARGET).map
+	@$(RM_CMD) $(TARGET).hex
+	@$(RM_CMD) $(TARGET).lst
+	@$(RM_CMD) $(TARGET).o
 
 .PHONY: all build size disass disass-all debug ocd burn clean

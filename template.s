@@ -468,12 +468,12 @@ _start:
     bl	INIT_TC_PSP
 
 loop:
-//	bl LED_ON
-//	mov r0, 500
-//	bl DELAYTC
-//	bl LED_OFF
-//	mov r0, 500
-//	bl DELAYTC
+	bl LED_ON
+	mov r0, 500
+	bl DELAYTC
+	bl LED_OFF
+	mov r0, 500
+	bl DELAYTC
 	b loop                      // Jump to loop
 
 INIT_TC_PSP:
