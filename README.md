@@ -82,6 +82,21 @@ mode. It is always set when an SPI communication is ongoing.
 SSI bit is cleared in NSS software mode) and the SCK is running
 
 
+## 6.3.14 RCC APB2 peripheral clock enable register (RCC_APB2ENR) BASE ADDRESS: 0x4002 3800
+- Address offset: 0x44
+
+### Bit 12 SPI1EN: SPI1 clock enable
+- This bit is set and cleared by software.
+  - 0: SPI1 clock disabled
+  - 1: SPI1 clock enabled
+
+### Bit 8 ADC1EN: ADC1 clock enable
+- This bit is set and cleared by software.
+  - 0: ADC1 clock disabled
+  - 1: ADC1 clock enabled
+
+I Think the default clock speed will be 16mhz
+
 ## SPI1 BASE
 
 0x4001 3000 - 0x4001 33FF SPI1 | Section 28.5.10: SPI register map on page 925
@@ -108,3 +123,19 @@ When  no-decode  is  selected,  data  bits  D7–D0  corre-spond to the segment 
 
 https://stackoverflow.com/questions/41133261/led-8x8-matrix-with-max7219-on-arm-stm32-mikroc
 
+
+
+## ???
+Warning: Since some SPI1 and SPI3/I2S3 pins may be mapped onto
+some pins used by the JTAG interface (SPI1_NSS onto JTDI,
+SPI3_NSS/I2S3_WS onto JTDI and SPI3_SCK/I2S3_CK onto
+JTDO), you may either:
+– map SPI/I2S onto other pins
+– disable the JTAG and use the SWD interface prior to
+configuring the pins listed as SPI I/Os (when debugging the
+application) or
+– disable both JTAG/SWD interfaces (for standalone
+applications).
+For more information on the configuration of the JTAG/SWD
+interface pins, please refer to Section 8.3.2: I/O pin
+multiplexer and mapping.

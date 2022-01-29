@@ -1,4 +1,3 @@
-.vscode
 *.o
 *.bin
 *.elf
@@ -10,3 +9,5 @@ Debug/
 Release/
 .metadata
 *.launch
+.cortex-debug.peripherals.state.json
+.cortex-debug.registers.state.json

@@ -1,5 +1,5 @@
 TARGET = main
-SRCS = src/main.S
+SRCS = ./src/main.s
 
 OBJS =  $(addsuffix .o, $(basename $(SRCS)))
 INCLUDES = -I.

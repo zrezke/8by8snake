@@ -25,6 +25,37 @@
 // Definitions section. Define all the registers and
 // constants here for code readability.
 
+
+
+@RCC
+.equ  RCC_BASE,  0x40023800
+.equ  RCC_APB2ENR,  0x44
+
+@ SPI1
+.equ  SPI1_BASE,  0x40013000
+
+@ SPI register offsets
+.equ  SPI_CR2,  0x04
+.equ  SPI_SR, 0x08
+.equ  SPI_DR, 0x0C
+.equ  SPI_CRCPR,  0x10
+.equ  SPI_RXCRCR, 0x14
+.equ  SPI_TXCRCR, 0x18
+.equ  SPI_I2SCFGR,  0x1C
+.equ  SPI_I2SPR,  0x20
+
+@ SPI_CR1 config
+.equ  SPI_CR1_CFG,  0x4844
+@ .equ  SPI_LSBFIRST_TX_ONLY, 
+
+@ GPIOA
+.equ  GPIOA_BASE, 0x40020000
+.equ  GPIO_AFRL,  0x20
+.equ  GPIO_AFRH,  0x24
+
+
+
+
 // Constants
 .equ     LEDDELAY,      4000
 // By default 16MHz internal HSI clock is enabled
