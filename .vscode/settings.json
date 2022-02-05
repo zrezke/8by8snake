@@ -1,4 +1,24 @@
 {
-  "cortex-debug.variableUseNaturalFormat": false,
-  "cortex-debug.registerUseNaturalFormat": false
+  "cortex-debug.variableUseNaturalFormat": true,
+  "cortex-debug.registerUseNaturalFormat": false,
+  "files.associations": {
+    "*.epub": "xml",
+    "*.Rmd": "rmarkdown",
+    "*.rmd": "markdown",
+    "*.html": "html",
+    ".clang-format": "yaml",
+    ".htmlhintrc": "json",
+    ".prettierrc": "json",
+    ".stylelintrc": "json",
+    "rccconfig_f446.h": "c"
+  },
+  "cSpell.words": [
+    "ADCPRE",
+    "ADON",
+    "EOCS",
+    "GPIOA",
+    "MODER",
+    "MOSI",
+    "SWSTART"
+  ]
 }

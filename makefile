@@ -1,14 +1,14 @@
 TARGET = main
-SRCS = ./src/main.s
+SRCS = ./src/main.S
 
 OBJS =  $(addsuffix .o, $(basename $(SRCS)))
 INCLUDES = -I.
 
 LINKER_SCRIPT = stm32.ld
-
 CFLAGS += -mcpu=cortex-m4 -mthumb # processor setup
 CFLAGS += -O0 # optimization is off
-CFLAGS += -g2 # generate debug info
+CFLAGS += -g3 # generate debug info
+CFLAGS += -gdwarf
 CFLAGS += -fno-common
 CFLAGS += -Wall # turn on warnings
 CFLAGS += -pedantic # more warnings

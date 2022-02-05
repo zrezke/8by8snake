@@ -1,141 +1,131 @@
 # 8x8 Snake game
 
-- MOSI: Master Out / Slave In data. This pin can be used to transmit data in master
-mode and receive data in slave mode.
+## What is it and how does it work?
+This is a [snake game](https://en.wikipedia.org/wiki/Snake_(video_game_genre)), implemented 100% in arm assembly on the STM32F407G-DISC1 board.
+The game is displayed on an 8x8 LED matrix, and you can control the snake by playstation style joystick.
 
-- Hardware or software slave select management can be set using the SSM bit in the
-SPI_CR1 register.
-  - Software NSS management (SSM = 1) 
-  The slave select information is driven internally by the value of the SSI bit in the
-   SPI_CR1 register. The external NSS pin remains free for other application uses.
+This project uses:
+- [SPI](https://en.wikipedia.org/wiki/Serial_Peripheral_Interface) to send pixel data to an 8x8 LED matrix interfaced with [MAX7219](https://html.alldatasheet.com/html-pdf/73745/MAXIM/MAX7219/126/1/MAX7219.html) display driver.
+- [ADC](https://en.wikipedia.org/wiki/Analog-to-digital_converter) to convert joystick position to a digital value.
+- [DMA](https://en.wikipedia.org/wiki/Direct_memory_access) to save CPU time by storing ADC data to RAM using the DMA instead of CPU.
 
-## Clock phase and clock polarity
-Four possible timing relationships may be chosen by software, using the CPOL and CPHA
-bits in the SPI_CR1 register. The CPOL (clock polarity) bit controls the steady state value of
-the clock when no data is being transferred. This bit affects both master and slave modes. If
-CPOL is reset, the SCK pin has a low-level idle state. If CPOL is set, the SCK pin has a
-high-level idle state.
-If the CPHA (clock phase) bit is set, the second edge on the SCK pin (falling edge if the
-CPOL bit is reset, rising edge if the CPOL bit is set) is the MSBit capture strobe. Data are
-latched on the occurrence of the second clock transition. If the CPHA bit is reset, the first
-edge on the SCK pin (falling edge if CPOL bit is set, rising edge if CPOL bit is reset) is the
-MSBit capture strobe. Data are latched on the occurrence of the first clock transition.
+# Detailed description of how it works
 
-## for led matrix we need: `CPOL`: reset (low idle), `CPHA`: Probably reset (rising edge), because matrix reads on rising edge?
+## Schematic
+To make it more clear how our components are connected to the STM32 here is a schematic.
 
-Prior to changing the CPOL/CPHA bits the SPI must be disabled by resetting the SPE bit.
-Master and slave must be programmed with the same timing mode.
-The idle state of SCK must correspond to the polarity selected in the SPI_CR1 register (by
-pulling up SCK if CPOL=1 or pulling down SCK if CPOL=0).
-The Data Frame Format (8- or 16-bit) is selected through the DFF bit in SPI_CR1 register,
-and determines the data length during transmission/reception.
+[There will eventually be a schematic here]
+
+## 1. Initializing the IO
+
+The STM32 has many GPIO ports in this project we only use pins from the GPIOA port.
+### Pins we use:
+- PA1: Joystick Y position input
+- PA2: Joystick X position input
+- PA4: Chip select for selecting the LED matrix when using SPI
+- PA5: Clock signal for the SPI slave (8x8 matrix)
+- PA7: MOSI (Master output slave input) pin used for sending data to LED matrix
+
+To use these pins as GPIO-s correctly we have to write an initialization function first.
+### In this function we:
+- Enable GPIOA clock.
+- Select the mode we want for each pin.
+  - PA1: Analog mode
+  - PA2: Analog mode
+  - PA4: General purpose output mode
+  - PA5: Alternate function mode
+  - PA7: Alternate function mode
+- For pins that are configured in alternate function mode:
+  - Select alternate function (AF0-15)
+
+The actual implementation of this function is called `init_io` in `src/main.s`.
+
+If you take a look at `init_io` you will notice that at the end we also set a bit in the GPIOA_ODR register. This is to pull PA4 (chip select) high which is necessary for correct SPI communication which will be described in detail later.
+
+More detail about GPIO on this particular chip is available in the [Reference manual](https://www.st.com/resource/en/reference_manual/dm00031020-stm32f405-415-stm32f407-417-stm32f427-437-and-stm32f429-439-advanced-arm-based-32-bit-mcus-stmicroelectronics.pdf) in chapter: `8 General-purpose I/Os (GPIO)`
+
+## 2. Configuring the ADC and DMA
+We will use the ADC and DMA to convert and store the joystick position. 
+So first we need to configure the ADC
+## Configuring the ADC
+This procedure is implemented as `init_adc1` and `enable_adc1` in `src/main.s`.
+
+### What we do:
+- Enable ADC1 clock (set ADC1EN in RCC_APB2ENR)
+- Reset all ADC1 registers.
+- Set resolution to 10 bits.
+  - We could also just use 8bits because we really don't need accuracy here...
+- Enable scan mode (set SCAN in ADC_CR1)
+  - Scan mode makes the ADC convert all channels that we specify in ADC_SQR registers in [round robin](https://www.google.com/search?q=round+robin) fashion.
+- Set CONT bit, continuous conversion (set CONT in ADC_CR2)
+  - Enables continuous conversion, so ADC doesn't stop after we have converted all channels.
+- Enable setting EOC flag after each conversion (set EOCS in ADC_CR2)
+- Enable DMA and DDS (set DMA and DDS in ADC_CR2)
+  - Since we will use DMA to transfer data to memory, we need to tell this to the ADC (set DMA bit).
+  - We also set DDS bit so that the ADC keeps issuing DMA requests as long as data are converted and DMA bit is set.
+- Set 2 conversions as regular channel sequence length (set L as 0b1 in ADC_SQR1)
+- Select order of conversions as -> PA1, PA2. (ADC_SQR3 register)
+- Enable the ADC (ADC1) (ADON bit in ADC_CR2)
+- Wait 10ms for ADC to stabilize.
+
+Now the ADC is configured, **but not yet started**. This is important, because if we would actually
+ start converting data the ADC would fail as an overrun would occur. Overruns occur 
+ when the ADC_DR (data register) gets overwritten before it has been read from, hence invalidating the data.
+
+Next of we will configure the DMA.
+## Configuring the DMA
+
+The STM32 has two DMA controllers. In this project we are using DMA2, because DMA1 isn't connected to ADC1.
+DMA2 however has ADC1 available on Channel0 Stream0 (and also stream4) according to the DMA2 request mapping.
+![](dma2_request_mapping.png)
+
+### To initialize DMA2:
+- Enable DMA2 clock (set bit 22 in AHB1ENR)
+- Reset DMA_S0CR
+- Wait for EN bit in DMA_S0CR to reset.
+- Reset DMA_LISR and DMA_HISR registers.
+- Select Channel 0 Stream 0 (CHSEL bits in DMA_S0CR)
+- Select direction peripheral to memory (DIR bits in DMA_S0CR)
+- Set peripheral data size and memory data size as half word, because ADC resolution is set to 12 bit. (PSIZE, MSIZE in DMA_S0CR)
+- Set priority level as very high (PL bits in DMA_S0CR)
+- Enable circular mode (CIRC bit in DMA_S0CR)
+- Enable memory increment mode (MINC bit in DMA_S0CR)
+- Set 2 as the number of data items to transfer (DMA_S0NDTR register)
+- Set stream0 Peripheral address in DMA_S0PAR register. I set this address as `ADC1_BASE + ADC_DR`; So the data register of ADC1
+- Set stream0 memory address in DMA_S0MAR as address of `JOYSTICK_POS`
+- Enable Stream0, (EN bit in DMA_S0CR)
 
 
-Data can be shifted out either MSB-first or LSB-first depending on the value of the
-LSBFIRST bit in the SPI_CR1 register.
-
-Each data frame is 8 or 16 bits long depending on the size of the data programmed using
-the DFF bit in the SPI_CR1 register -> 16 
-
-## 28.3.3 Configuring the SPI in master mode
-In the master configuration, the serial clock is generated on the SCK pin.
-Procedure
-!!1. Select the BR[2:0] bits to define the serial clock baud rate (see SPI_CR1 register).
-2. Select the CPOL and CPHA bits to define one of the four relationships between the
-data transfer and the serial clock (see Figure 248). This step is not required when the
-TI mode is selected.
-3. Set the DFF bit to define 8- or 16-bit data frame format
-4. Configure the LSBFIRST bit in the SPI_CR1 register to define the frame format. This
-step is not required when the TI mode is selected.
-5. If the NSS pin is required in input mode, in hardware mode, connect the NSS pin to a
-high-level signal during the complete byte transmit sequence. In NSS software mode,
-set the SSM and SSI bits in the SPI_CR1 register. If the NSS pin is required in output
-mode, the SSOE bit only should be set. This step is not required when the TI mode is
-selected.
-6. Set the FRF bit in SPI_CR2 to select the TI protocol for serial communications.
-7. The MSTR and SPE bits must be set (they remain set only if the NSS pin is connected
-to a high-level signal).
-In this configuration the MOSI pin is a data output and the MISO pin is a data input.
-![](spi_reg_map.png)
-
-## 28.3.4 Configuring the SPI for half-duplex communication
-The SPI is capable of operating in half-duplex mode in 2 configurations.
-• 1 clock and 1 bidirectional data wire
-• 1 clock and 1 data wire (receive-only or transmit-only)
-
-## 1 clock and 1 unidirectional data wire (BIDIMODE = 0)
-In this mode, the application can use the SPI either in transmit-only mode or in receive-only
-mode.
-• Transmit-only mode is similar to full-duplex mode (BIDIMODE=0, RXONLY=0): the
-data are transmitted on the transmit pin (MOSI in master mode or MISO in slave mode)
-and the receive pin (MISO in master mode or MOSI in slave mode) can be used as a
-general-purpose IO. In this case, the application just needs to ignore the Rx buffer (if
-the data register is read, it does not contain the received value).
-• In receive-only mode, the application can disable the SPI output function by setting the
-RXONLY bit in the SPI_CR1 register. In this case, it frees the transmit IO pin (MOSI in
-master mode or MISO in slave mode), so it can be used for other purposes.
-To start the communication in receive-only mode, configure and enable the SPI:
-• In master mode, the communication starts immediately and stops when the SPE bit is
-cleared and the current reception stops. There is no need to read the BSY flag in this
-mode. It is always set when an SPI communication is ongoing.
-• In slave mode, the SPI continues to receive as long as the NSS is pulled down (or the
-SSI bit is cleared in NSS software mode) and the SCK is running
-
-
-## 6.3.14 RCC APB2 peripheral clock enable register (RCC_APB2ENR) BASE ADDRESS: 0x4002 3800
-- Address offset: 0x44
-
-### Bit 12 SPI1EN: SPI1 clock enable
-- This bit is set and cleared by software.
-  - 0: SPI1 clock disabled
-  - 1: SPI1 clock enabled
-
-### Bit 8 ADC1EN: ADC1 clock enable
-- This bit is set and cleared by software.
-  - 0: ADC1 clock disabled
-  - 1: ADC1 clock enabled
-
-I Think the default clock speed will be 16mhz
-
-## SPI1 BASE
-
-0x4001 3000 - 0x4001 33FF SPI1 | Section 28.5.10: SPI register map on page 925
-
-## ADC1 BASE
-0x4001 2000 - 0x4001 23FF ADC1 - ADC2 - ADC3 Section 13.13.18: ADC register map on page 430
-
-both on APB2
-
-## GPIO
-
-AFRH 
-
-GPIOA 0x4002 0000 - 0x4002 03FF
-MODER 0x00
-OTYPER 0x04
-AFRL 0x20
-AFRH 0x24
-
-## 28.5.10 SPI register map
-
-## DISPLAY 
-When  no-decode  is  selected,  data  bits  D7–D0  corre-spond to the segment lines of the MAX7219/MAX7221.Table  6  shows  the  one-to-one  pairing  of  each  data  bitto the appropriate segment line.
-
-https://stackoverflow.com/questions/41133261/led-8x8-matrix-with-max7219-on-arm-stm32-mikroc
+## Start conversion
+After we have both ADC and DMA set up we can actually start converting and storing data.
+### To do so we need to:
+- Reset ADC1 status register (ADC_SR)
+- Start conversion of regular channels on ADC1 (Set SWSTART in ADC_CR2)
 
 
 
-## ???
-Warning: Since some SPI1 and SPI3/I2S3 pins may be mapped onto
-some pins used by the JTAG interface (SPI1_NSS onto JTDI,
-SPI3_NSS/I2S3_WS onto JTDI and SPI3_SCK/I2S3_CK onto
-JTDO), you may either:
-– map SPI/I2S onto other pins
-– disable the JTAG and use the SWD interface prior to
-configuring the pins listed as SPI I/Os (when debugging the
-application) or
-– disable both JTAG/SWD interfaces (for standalone
-applications).
-For more information on the configuration of the JTAG/SWD
-interface pins, please refer to Section 8.3.2: I/O pin
-multiplexer and mapping.
+
+
+## 2. Getting joystick input data
+
+A joystick is essentially just two [potentiometers](https://en.wikipedia.org/wiki/Potentiometer), 
+one for the X and one for the Y axis.
+
+By moving the stick you move the potentiometer, thereby adjusting the resistance.
+More resistance == less voltage and vice versa.
+
+These voltages are two of five output pins from the joystick module (VRx and VRy).
+The other pins are VCC and GND, and lastly the SW pin, which is connected to the switch of the stick (active when you press down).
+
+As mentioned in [section 1](#1.-Initializing-the-IO), we are using pins PA1 (VRy) and PA2 (VRx) as Y and X inputs.
+![](./documentation/joystick_mapping.png)
+
+To 
+
+## 3. Communicating with the LED matrix
+Configuration of the serial peripheral interface is implemented as `init_spi1` in `src/main.s`.
+The STM32 has three serial peripheral interfaces (SPI1, SPI2, SPI3).
+As you can probably tell by how I named my init_spi1 function, we are going to use SPI1.
+
+
+
