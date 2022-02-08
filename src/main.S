@@ -84,17 +84,39 @@
 
 .equ  SYSTICK_RELOAD_1MS,	15999  //1 msec at 16MHz ...  16 000 000 / 500 - 1
 
+.section .rodata
+ROWS: .byte 1, 2, 4, 8, 16, 32, 64, 128
+
 .section .data
+.section .bss
 JOYSTICK_POS: .space 4
 
+/*
+SNAKE_POS is really just an implicit linked list,
+ so we also need a "first" variable and a next field...
+*/
+SNAKE_POS: .space 128 @(8x8 x HWORD)
+@ SNAKE_POS_NEXT: .space 64 @ Only need offset from SNAKE_POS base so a byte for each is enough
+@ SNAKE_POS_FIRST: .space 1
+
+SNAKE_LENGTH: .space 1
+DIRECTION: .space 1
+/* SNAKE DIRECTION
+0 -> left
+1 -> right
+2 -> up
+3 -> down
+*/
 .section .text
-///////////////////////////////////////////////////////////////////////////////
-// Vectors
-///////////////////////////////////////////////////////////////////////////////
-// Vector table start
-// Add all other processor specific exceptions/interrupts in order here
-	.long    __StackTop                 // Top of the stack. from linker script
-	.long    _start +1                  // reset location, +1 for thumb mode
+
+vector_table:
+  ///////////////////////////////////////////////////////////////////////////////
+  // Vectors
+  ///////////////////////////////////////////////////////////////////////////////
+  // Vector table start
+  // Add all other processor specific exceptions/interrupts in order here
+  .long    __StackTop                 // Top of the stack. from linker script
+  .long    _start +1                  // reset location, +1 for thumb mode
   .word  NMI_Handler
   .word  HardFault_Handler
   .word  MemManage_Handler
@@ -195,282 +217,282 @@ JOYSTICK_POS: .space 4
   .word     FPU_IRQHandler                    /* FPU                          */
 
 
-/*******************************************************************************
-*
-* Provide weak aliases for each Exception handler to the Default_Handler.
-* As they are weak aliases, any function with the same name will override
-* this definition.
-*
-*******************************************************************************/
-   .weak      NMI_Handler
-   .thumb_set NMI_Handler,Default_Handler
+  /*******************************************************************************
+  *
+  * Provide weak aliases for each Exception handler to the Default_Handler.
+  * As they are weak aliases, any function with the same name will override
+  * this definition.
+  *
+  *******************************************************************************/
+  .weak      NMI_Handler
+  .thumb_set NMI_Handler,Default_Handler
 
-   .weak      HardFault_Handler
-   .thumb_set HardFault_Handler,Default_Handler
+  .weak      HardFault_Handler
+  .thumb_set HardFault_Handler,Default_Handler
 
-   .weak      MemManage_Handler
-   .thumb_set MemManage_Handler,Default_Handler
+  .weak      MemManage_Handler
+  .thumb_set MemManage_Handler,Default_Handler
 
-   .weak      BusFault_Handler
-   .thumb_set BusFault_Handler,Default_Handler
+  .weak      BusFault_Handler
+  .thumb_set BusFault_Handler,Default_Handler
 
-   .weak      UsageFault_Handler
-   .thumb_set UsageFault_Handler,Default_Handler
+  .weak      UsageFault_Handler
+  .thumb_set UsageFault_Handler,Default_Handler
 
-   .weak      SVC_Handler
-   .thumb_set SVC_Handler,Default_Handler
+  .weak      SVC_Handler
+  .thumb_set SVC_Handler,Default_Handler
 
-   .weak      DebugMon_Handler
-   .thumb_set DebugMon_Handler,Default_Handler
+  .weak      DebugMon_Handler
+  .thumb_set DebugMon_Handler,Default_Handler
 
-   .weak      PendSV_Handler
-   .thumb_set PendSV_Handler,Default_Handler
+  .weak      PendSV_Handler
+  .thumb_set PendSV_Handler,Default_Handler
 
-   .weak      SysTick_Handler
-   .thumb_set SysTick_Handler,Default_Handler
+  .weak      SysTick_Handler
+  .thumb_set SysTick_Handler,Default_Handler
 
-   .weak      WWDG_IRQHandler
-   .thumb_set WWDG_IRQHandler,Default_Handler
+  .weak      WWDG_IRQHandler
+  .thumb_set WWDG_IRQHandler,Default_Handler
 
-   .weak      PVD_IRQHandler
-   .thumb_set PVD_IRQHandler,Default_Handler
+  .weak      PVD_IRQHandler
+  .thumb_set PVD_IRQHandler,Default_Handler
 
-   .weak      TAMP_STAMP_IRQHandler
-   .thumb_set TAMP_STAMP_IRQHandler,Default_Handler
+  .weak      TAMP_STAMP_IRQHandler
+  .thumb_set TAMP_STAMP_IRQHandler,Default_Handler
 
-   .weak      RTC_WKUP_IRQHandler
-   .thumb_set RTC_WKUP_IRQHandler,Default_Handler
+  .weak      RTC_WKUP_IRQHandler
+  .thumb_set RTC_WKUP_IRQHandler,Default_Handler
 
-   .weak      FLASH_IRQHandler
-   .thumb_set FLASH_IRQHandler,Default_Handler
+  .weak      FLASH_IRQHandler
+  .thumb_set FLASH_IRQHandler,Default_Handler
 
-   .weak      RCC_IRQHandler
-   .thumb_set RCC_IRQHandler,Default_Handler
+  .weak      RCC_IRQHandler
+  .thumb_set RCC_IRQHandler,Default_Handler
 
-   .weak      EXTI0_IRQHandler
-   .thumb_set EXTI0_IRQHandler,Default_Handler
+  .weak      EXTI0_IRQHandler
+  .thumb_set EXTI0_IRQHandler,Default_Handler
 
-   .weak      EXTI1_IRQHandler
-   .thumb_set EXTI1_IRQHandler,Default_Handler
+  .weak      EXTI1_IRQHandler
+  .thumb_set EXTI1_IRQHandler,Default_Handler
 
-   .weak      EXTI2_IRQHandler
-   .thumb_set EXTI2_IRQHandler,Default_Handler
+  .weak      EXTI2_IRQHandler
+  .thumb_set EXTI2_IRQHandler,Default_Handler
 
-   .weak      EXTI3_IRQHandler
-   .thumb_set EXTI3_IRQHandler,Default_Handler
+  .weak      EXTI3_IRQHandler
+  .thumb_set EXTI3_IRQHandler,Default_Handler
 
-   .weak      EXTI4_IRQHandler
-   .thumb_set EXTI4_IRQHandler,Default_Handler
+  .weak      EXTI4_IRQHandler
+  .thumb_set EXTI4_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream0_IRQHandler
-   .thumb_set DMA1_Stream0_IRQHandler,Default_Handler
+  .weak      DMA1_Stream0_IRQHandler
+  .thumb_set DMA1_Stream0_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream1_IRQHandler
-   .thumb_set DMA1_Stream1_IRQHandler,Default_Handler
+  .weak      DMA1_Stream1_IRQHandler
+  .thumb_set DMA1_Stream1_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream2_IRQHandler
-   .thumb_set DMA1_Stream2_IRQHandler,Default_Handler
+  .weak      DMA1_Stream2_IRQHandler
+  .thumb_set DMA1_Stream2_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream3_IRQHandler
-   .thumb_set DMA1_Stream3_IRQHandler,Default_Handler
+  .weak      DMA1_Stream3_IRQHandler
+  .thumb_set DMA1_Stream3_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream4_IRQHandler
-   .thumb_set DMA1_Stream4_IRQHandler,Default_Handler
+  .weak      DMA1_Stream4_IRQHandler
+  .thumb_set DMA1_Stream4_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream5_IRQHandler
-   .thumb_set DMA1_Stream5_IRQHandler,Default_Handler
+  .weak      DMA1_Stream5_IRQHandler
+  .thumb_set DMA1_Stream5_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream6_IRQHandler
-   .thumb_set DMA1_Stream6_IRQHandler,Default_Handler
+  .weak      DMA1_Stream6_IRQHandler
+  .thumb_set DMA1_Stream6_IRQHandler,Default_Handler
 
-   .weak      ADC_IRQHandler
-   .thumb_set ADC_IRQHandler,Default_Handler
+  .weak      ADC_IRQHandler
+  .thumb_set ADC_IRQHandler,Default_Handler
 
-   .weak      CAN1_TX_IRQHandler
-   .thumb_set CAN1_TX_IRQHandler,Default_Handler
+  .weak      CAN1_TX_IRQHandler
+  .thumb_set CAN1_TX_IRQHandler,Default_Handler
 
-   .weak      CAN1_RX0_IRQHandler
-   .thumb_set CAN1_RX0_IRQHandler,Default_Handler
+  .weak      CAN1_RX0_IRQHandler
+  .thumb_set CAN1_RX0_IRQHandler,Default_Handler
 
-   .weak      CAN1_RX1_IRQHandler
-   .thumb_set CAN1_RX1_IRQHandler,Default_Handler
+  .weak      CAN1_RX1_IRQHandler
+  .thumb_set CAN1_RX1_IRQHandler,Default_Handler
 
-   .weak      CAN1_SCE_IRQHandler
-   .thumb_set CAN1_SCE_IRQHandler,Default_Handler
+  .weak      CAN1_SCE_IRQHandler
+  .thumb_set CAN1_SCE_IRQHandler,Default_Handler
 
-   .weak      EXTI9_5_IRQHandler
-   .thumb_set EXTI9_5_IRQHandler,Default_Handler
+  .weak      EXTI9_5_IRQHandler
+  .thumb_set EXTI9_5_IRQHandler,Default_Handler
 
-   .weak      TIM1_BRK_TIM9_IRQHandler
-   .thumb_set TIM1_BRK_TIM9_IRQHandler,Default_Handler
+  .weak      TIM1_BRK_TIM9_IRQHandler
+  .thumb_set TIM1_BRK_TIM9_IRQHandler,Default_Handler
 
-   .weak      TIM1_UP_TIM10_IRQHandler
-   .thumb_set TIM1_UP_TIM10_IRQHandler,Default_Handler
+  .weak      TIM1_UP_TIM10_IRQHandler
+  .thumb_set TIM1_UP_TIM10_IRQHandler,Default_Handler
 
-   .weak      TIM1_TRG_COM_TIM11_IRQHandler
-   .thumb_set TIM1_TRG_COM_TIM11_IRQHandler,Default_Handler
+  .weak      TIM1_TRG_COM_TIM11_IRQHandler
+  .thumb_set TIM1_TRG_COM_TIM11_IRQHandler,Default_Handler
 
-   .weak      TIM1_CC_IRQHandler
-   .thumb_set TIM1_CC_IRQHandler,Default_Handler
+  .weak      TIM1_CC_IRQHandler
+  .thumb_set TIM1_CC_IRQHandler,Default_Handler
 
-   .weak      TIM2_IRQHandler
-   .thumb_set TIM2_IRQHandler,Default_Handler
+  .weak      TIM2_IRQHandler
+  .thumb_set TIM2_IRQHandler,Default_Handler
 
-   .weak      TIM3_IRQHandler
-   .thumb_set TIM3_IRQHandler,Default_Handler
+  .weak      TIM3_IRQHandler
+  .thumb_set TIM3_IRQHandler,Default_Handler
 
-   .weak      TIM4_IRQHandler
-   .thumb_set TIM4_IRQHandler,Default_Handler
+  .weak      TIM4_IRQHandler
+  .thumb_set TIM4_IRQHandler,Default_Handler
 
-   .weak      I2C1_EV_IRQHandler
-   .thumb_set I2C1_EV_IRQHandler,Default_Handler
+  .weak      I2C1_EV_IRQHandler
+  .thumb_set I2C1_EV_IRQHandler,Default_Handler
 
-   .weak      I2C1_ER_IRQHandler
-   .thumb_set I2C1_ER_IRQHandler,Default_Handler
+  .weak      I2C1_ER_IRQHandler
+  .thumb_set I2C1_ER_IRQHandler,Default_Handler
 
-   .weak      I2C2_EV_IRQHandler
-   .thumb_set I2C2_EV_IRQHandler,Default_Handler
+  .weak      I2C2_EV_IRQHandler
+  .thumb_set I2C2_EV_IRQHandler,Default_Handler
 
-   .weak      I2C2_ER_IRQHandler
-   .thumb_set I2C2_ER_IRQHandler,Default_Handler
+  .weak      I2C2_ER_IRQHandler
+  .thumb_set I2C2_ER_IRQHandler,Default_Handler
 
-   .weak      SPI1_IRQHandler
-   .thumb_set SPI1_IRQHandler,Default_Handler
+  .weak      SPI1_IRQHandler
+  .thumb_set SPI1_IRQHandler,Default_Handler
 
-   .weak      SPI2_IRQHandler
-   .thumb_set SPI2_IRQHandler,Default_Handler
+  .weak      SPI2_IRQHandler
+  .thumb_set SPI2_IRQHandler,Default_Handler
 
-   .weak      USART1_IRQHandler
-   .thumb_set USART1_IRQHandler,Default_Handler
+  .weak      USART1_IRQHandler
+  .thumb_set USART1_IRQHandler,Default_Handler
 
-   .weak      USART2_IRQHandler
-   .thumb_set USART2_IRQHandler,Default_Handler
+  .weak      USART2_IRQHandler
+  .thumb_set USART2_IRQHandler,Default_Handler
 
-   .weak      USART3_IRQHandler
-   .thumb_set USART3_IRQHandler,Default_Handler
+  .weak      USART3_IRQHandler
+  .thumb_set USART3_IRQHandler,Default_Handler
 
-   .weak      EXTI15_10_IRQHandler
-   .thumb_set EXTI15_10_IRQHandler,Default_Handler
+  .weak      EXTI15_10_IRQHandler
+  .thumb_set EXTI15_10_IRQHandler,Default_Handler
 
-   .weak      RTC_Alarm_IRQHandler
-   .thumb_set RTC_Alarm_IRQHandler,Default_Handler
+  .weak      RTC_Alarm_IRQHandler
+  .thumb_set RTC_Alarm_IRQHandler,Default_Handler
 
-   .weak      OTG_FS_WKUP_IRQHandler
-   .thumb_set OTG_FS_WKUP_IRQHandler,Default_Handler
+  .weak      OTG_FS_WKUP_IRQHandler
+  .thumb_set OTG_FS_WKUP_IRQHandler,Default_Handler
 
-   .weak      TIM8_BRK_TIM12_IRQHandler
-   .thumb_set TIM8_BRK_TIM12_IRQHandler,Default_Handler
+  .weak      TIM8_BRK_TIM12_IRQHandler
+  .thumb_set TIM8_BRK_TIM12_IRQHandler,Default_Handler
 
-   .weak      TIM8_UP_TIM13_IRQHandler
-   .thumb_set TIM8_UP_TIM13_IRQHandler,Default_Handler
+  .weak      TIM8_UP_TIM13_IRQHandler
+  .thumb_set TIM8_UP_TIM13_IRQHandler,Default_Handler
 
-   .weak      TIM8_TRG_COM_TIM14_IRQHandler
-   .thumb_set TIM8_TRG_COM_TIM14_IRQHandler,Default_Handler
+  .weak      TIM8_TRG_COM_TIM14_IRQHandler
+  .thumb_set TIM8_TRG_COM_TIM14_IRQHandler,Default_Handler
 
-   .weak      TIM8_CC_IRQHandler
-   .thumb_set TIM8_CC_IRQHandler,Default_Handler
+  .weak      TIM8_CC_IRQHandler
+  .thumb_set TIM8_CC_IRQHandler,Default_Handler
 
-   .weak      DMA1_Stream7_IRQHandler
-   .thumb_set DMA1_Stream7_IRQHandler,Default_Handler
+  .weak      DMA1_Stream7_IRQHandler
+  .thumb_set DMA1_Stream7_IRQHandler,Default_Handler
 
-   .weak      FSMC_IRQHandler
-   .thumb_set FSMC_IRQHandler,Default_Handler
+  .weak      FSMC_IRQHandler
+  .thumb_set FSMC_IRQHandler,Default_Handler
 
-   .weak      SDIO_IRQHandler
-   .thumb_set SDIO_IRQHandler,Default_Handler
+  .weak      SDIO_IRQHandler
+  .thumb_set SDIO_IRQHandler,Default_Handler
 
-   .weak      TIM5_IRQHandler
-   .thumb_set TIM5_IRQHandler,Default_Handler
+  .weak      TIM5_IRQHandler
+  .thumb_set TIM5_IRQHandler,Default_Handler
 
-   .weak      SPI3_IRQHandler
-   .thumb_set SPI3_IRQHandler,Default_Handler
+  .weak      SPI3_IRQHandler
+  .thumb_set SPI3_IRQHandler,Default_Handler
 
-   .weak      UART4_IRQHandler
-   .thumb_set UART4_IRQHandler,Default_Handler
+  .weak      UART4_IRQHandler
+  .thumb_set UART4_IRQHandler,Default_Handler
 
-   .weak      UART5_IRQHandler
-   .thumb_set UART5_IRQHandler,Default_Handler
+  .weak      UART5_IRQHandler
+  .thumb_set UART5_IRQHandler,Default_Handler
 
-   .weak      TIM6_DAC_IRQHandler
-   .thumb_set TIM6_DAC_IRQHandler,Default_Handler
+  .weak      TIM6_DAC_IRQHandler
+  .thumb_set TIM6_DAC_IRQHandler,Default_Handler
 
-   .weak      TIM7_IRQHandler
-   .thumb_set TIM7_IRQHandler,Default_Handler
+  .weak      TIM7_IRQHandler
+  .thumb_set TIM7_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream0_IRQHandler
-   .thumb_set DMA2_Stream0_IRQHandler,Default_Handler
+  .weak      DMA2_Stream0_IRQHandler
+  .thumb_set DMA2_Stream0_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream1_IRQHandler
-   .thumb_set DMA2_Stream1_IRQHandler,Default_Handler
+  .weak      DMA2_Stream1_IRQHandler
+  .thumb_set DMA2_Stream1_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream2_IRQHandler
-   .thumb_set DMA2_Stream2_IRQHandler,Default_Handler
+  .weak      DMA2_Stream2_IRQHandler
+  .thumb_set DMA2_Stream2_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream3_IRQHandler
-   .thumb_set DMA2_Stream3_IRQHandler,Default_Handler
+  .weak      DMA2_Stream3_IRQHandler
+  .thumb_set DMA2_Stream3_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream4_IRQHandler
-   .thumb_set DMA2_Stream4_IRQHandler,Default_Handler
+  .weak      DMA2_Stream4_IRQHandler
+  .thumb_set DMA2_Stream4_IRQHandler,Default_Handler
 
-   .weak      ETH_IRQHandler
-   .thumb_set ETH_IRQHandler,Default_Handler
+  .weak      ETH_IRQHandler
+  .thumb_set ETH_IRQHandler,Default_Handler
 
-   .weak      ETH_WKUP_IRQHandler
-   .thumb_set ETH_WKUP_IRQHandler,Default_Handler
+  .weak      ETH_WKUP_IRQHandler
+  .thumb_set ETH_WKUP_IRQHandler,Default_Handler
 
-   .weak      CAN2_TX_IRQHandler
-   .thumb_set CAN2_TX_IRQHandler,Default_Handler
+  .weak      CAN2_TX_IRQHandler
+  .thumb_set CAN2_TX_IRQHandler,Default_Handler
 
-   .weak      CAN2_RX0_IRQHandler
-   .thumb_set CAN2_RX0_IRQHandler,Default_Handler
+  .weak      CAN2_RX0_IRQHandler
+  .thumb_set CAN2_RX0_IRQHandler,Default_Handler
 
-   .weak      CAN2_RX1_IRQHandler
-   .thumb_set CAN2_RX1_IRQHandler,Default_Handler
+  .weak      CAN2_RX1_IRQHandler
+  .thumb_set CAN2_RX1_IRQHandler,Default_Handler
 
-   .weak      CAN2_SCE_IRQHandler
-   .thumb_set CAN2_SCE_IRQHandler,Default_Handler
+  .weak      CAN2_SCE_IRQHandler
+  .thumb_set CAN2_SCE_IRQHandler,Default_Handler
 
-   .weak      OTG_FS_IRQHandler
-   .thumb_set OTG_FS_IRQHandler,Default_Handler
+  .weak      OTG_FS_IRQHandler
+  .thumb_set OTG_FS_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream5_IRQHandler
-   .thumb_set DMA2_Stream5_IRQHandler,Default_Handler
+  .weak      DMA2_Stream5_IRQHandler
+  .thumb_set DMA2_Stream5_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream6_IRQHandler
-   .thumb_set DMA2_Stream6_IRQHandler,Default_Handler
+  .weak      DMA2_Stream6_IRQHandler
+  .thumb_set DMA2_Stream6_IRQHandler,Default_Handler
 
-   .weak      DMA2_Stream7_IRQHandler
-   .thumb_set DMA2_Stream7_IRQHandler,Default_Handler
+  .weak      DMA2_Stream7_IRQHandler
+  .thumb_set DMA2_Stream7_IRQHandler,Default_Handler
 
-   .weak      USART6_IRQHandler
-   .thumb_set USART6_IRQHandler,Default_Handler
+  .weak      USART6_IRQHandler
+  .thumb_set USART6_IRQHandler,Default_Handler
 
-   .weak      I2C3_EV_IRQHandler
-   .thumb_set I2C3_EV_IRQHandler,Default_Handler
+  .weak      I2C3_EV_IRQHandler
+  .thumb_set I2C3_EV_IRQHandler,Default_Handler
 
-   .weak      I2C3_ER_IRQHandler
-   .thumb_set I2C3_ER_IRQHandler,Default_Handler
+  .weak      I2C3_ER_IRQHandler
+  .thumb_set I2C3_ER_IRQHandler,Default_Handler
 
-   .weak      OTG_HS_EP1_OUT_IRQHandler
-   .thumb_set OTG_HS_EP1_OUT_IRQHandler,Default_Handler
+  .weak      OTG_HS_EP1_OUT_IRQHandler
+  .thumb_set OTG_HS_EP1_OUT_IRQHandler,Default_Handler
 
-   .weak      OTG_HS_EP1_IN_IRQHandler
-   .thumb_set OTG_HS_EP1_IN_IRQHandler,Default_Handler
+  .weak      OTG_HS_EP1_IN_IRQHandler
+  .thumb_set OTG_HS_EP1_IN_IRQHandler,Default_Handler
 
-   .weak      OTG_HS_WKUP_IRQHandler
-   .thumb_set OTG_HS_WKUP_IRQHandler,Default_Handler
+  .weak      OTG_HS_WKUP_IRQHandler
+  .thumb_set OTG_HS_WKUP_IRQHandler,Default_Handler
 
-   .weak      OTG_HS_IRQHandler
-   .thumb_set OTG_HS_IRQHandler,Default_Handler
+  .weak      OTG_HS_IRQHandler
+  .thumb_set OTG_HS_IRQHandler,Default_Handler
 
-   .weak      DCMI_IRQHandler
-   .thumb_set DCMI_IRQHandler,Default_Handler
+  .weak      DCMI_IRQHandler
+  .thumb_set DCMI_IRQHandler,Default_Handler
 
-   .weak      HASH_RNG_IRQHandler
-   .thumb_set HASH_RNG_IRQHandler,Default_Handler
+  .weak      HASH_RNG_IRQHandler
+  .thumb_set HASH_RNG_IRQHandler,Default_Handler
 
-   .weak      FPU_IRQHandler
-   .thumb_set FPU_IRQHandler,Default_Handler
+  .weak      FPU_IRQHandler
+  .thumb_set FPU_IRQHandler,Default_Handler
 
 
 _start:
@@ -485,6 +507,184 @@ _start:
   bl dma2_joystick_config
   bl start_adc1
 
+  bl configure_matrix
+  bl init_snake
+
+  ldr r2, =SNAKE_LENGTH
+  mov r1, #3
+  strb r1, [r2]
+
+  @ For some reason .space doesn't initialize to 0...
+  ldr r2, =DIRECTION
+  mov r1, #0
+  strb r1, [r2]
+
+  @ @ Initialize first and next for SNAKE_POS
+  @ ldr r5, =SNAKE_POS_NEXT
+  @ ldr r4, =SNAKE_POS_FIRST
+  @ mov r6, #0
+  @ strb r6, [r4]
+  @ add r6, #1
+  @ strb r6, [r5], #1
+  @ @ End of list
+  @ mov r6, #-1
+  @ strb r6, [r5]
+
+
+main:
+  bl update_direction
+  bl update_snake
+  bl render
+  mov r0, #200
+  bl delay
+  b main
+
+update_snake:
+  push { r4, r5, r6, lr }
+  ldr r4, =SNAKE_POS
+  ldrh r0, [r4]
+  ldr r5, =DIRECTION
+  ldrb r6, [r5]
+  cmp r6, #0
+  beq move_left
+  cmp r6, #1
+  beq move_right
+  cmp r6, #2
+  beq move_up
+  cmp r6, #3
+  beq move_down
+
+  @ This one shifts the snake in memory
+  move_snake:
+    @ Already have SNAKE_POS address in r4
+    ldr r3, =SNAKE_LENGTH
+    ldrb r3, [r3]
+    @ Multiply length by 2 because of HWROD
+    mov r1, #2
+    sub r3, #1
+    mul r3, r1
+    sub r3, #2
+    move_snake_loop:
+      ldrh r2, [r4, r3]
+      add r3, #2
+      strh r2, [r4, r3]
+      sub r3, #4
+      cmp r3, #-2
+      bne move_snake_loop
+      strh r0, [r4]
+
+  pop { r4, r5, r6, pc }
+
+@ Supply with current head position in r0
+move_left:
+  sub r0, 0x100
+  cmp r0, #9
+  it lt
+  addlt r0, #0x800
+  b move_snake
+move_up:
+  @ F00 -> and row
+  @ FF -> and col
+  and r1, r0, #0xFF
+  mov r1, r1, lsl 1
+  cmp r1, #256
+  it eq
+  moveq r1, #1
+  and r0, #0xF00
+  eor r0, r1
+  b move_snake
+move_right:
+  add r0, 0x100
+  cmp r0, #0x900
+  it gt
+  movgt r0, #0x100
+  b move_snake
+move_down:
+  sub r0, 0x100
+  cmp r0, #9
+  it lt
+  addlt r0, #0x800
+  b move_snake
+
+update_direction:
+  push { r2, r3, r4, r5, r6, lr }
+  ldr r6, =JOYSTICK_POS
+
+  ldr r3, =DIRECTION
+  ldrb r2, [r3]
+  cmp r2, #2
+  blt check_x @ Logical Y axis
+  bge check_y @ Logical X axis
+
+  check_x:
+    ldrh r5, [r6, #2]
+    cmp r5, #600 @ Joystick is pointing down
+    itt gt
+    movgt r2, #3
+    strbgt r2, [r3]
+    
+    cmp r5, #300 @ Joystick is pointing up
+    itt lt
+    movlt r2, #2
+    strblt r2, [r3]
+    b exit_update_direction
+    
+  check_y:
+    ldrh r5, [r6]
+    cmp r5, #900 @ Joystick is pointing left
+    itt gt
+    movgt r2, #0
+    strbgt r2, [r3]
+    
+    cmp r5, #200 @ Joystick is pointing right
+    itt lt
+    movlt r2, #1
+    strblt r2, [r3]
+
+  exit_update_direction:
+  pop { r2, r3, r4, r5, r6, pc }
+
+render:
+  push { r0, r1, r2, r5, lr }
+  bl clear_display
+  mov r1, #0
+  ldr r2, =SNAKE_LENGTH
+  ldrb r2, [r2]
+  ldr r5, =SNAKE_POS
+  render_loop:
+    ldrh r0, [r5], #2
+    bl transmit_spi1
+    add r1, #1
+    cmp r1, r2
+    bne render_loop
+  pop { r0, r1, r2, r5, pc }
+
+init_snake:
+  push { r5, r6, lr }
+  ldr r6, =SNAKE_POS
+  ldr r5, =COL5+8
+  strh r5, [r6], #2
+  add r5, #0x100
+  strh r5, [r6], #2
+  add r5, #0x100
+  strh r5, [r6]
+
+  pop { r5, r6, pc }
+
+clear_display:
+  push { r5, r6, lr }
+
+  ldr r0, =COL0
+  clear_display_loop:
+    bl transmit_spi1
+    add r0, #256
+    cmp r0, #0x900
+    bne clear_display_loop
+
+  pop { r5, r6, pc }
+
+configure_matrix:
+  push { r0, lr }
   ldr r0, =ADDR_SHUTDOWN
   add r0, #1
   bl transmit_spi1
@@ -504,41 +704,7 @@ _start:
   bl transmit_spi1
 
   bl clear_display
-
-  ldr r1, =COL0
-  add r1, #1
-
-main:
-  ldr r0, =ADDR_DISPLAY_TEST
-  bl transmit_spi1
-  mov r0, r1
-  @ add r1, #1
-  @ add r1, #20
-  bl transmit_spi1
-  mov r0, #5
-  bl delay
-  ldr r0, =COL1
-  add r0, r0, #0x2
-  bl transmit_spi1
-  mov r0, #100
-  bl delay
-  ldr r6, =JOYSTICK_POS
-  ldrh r0, [r6]
-  ldrh r1, [r6, #2]
-  b main
-
-clear_display:
-  push { r5, r6, lr }
-
-  ldr r0, =COL0
-  clear_display_loop:
-    bl transmit_spi1
-    add r0, #256
-    cmp r0, #0x900
-    bne clear_display_loop
-
-  pop { r5, r6, pc }
-
+  pop { r0, pc }
 
 @ pass data through r0
 transmit_spi1:
