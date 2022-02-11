@@ -5,8 +5,11 @@
 //.arch armv7e-m  
 @RCC
 .equ  RCC_BASE,           0x40023800
+.equ  RCC_CR,             0x00
 .equ  RCC_AHB1ENR,        0x30
+.equ  RCC_AHB2ENR,        0x34
 .equ  RCC_APB2ENR,        0x44
+.equ  RCC_PLLCFGR,        0x4
 
 @ SPI1
 .equ  SPI1_BASE,          0x40013000
@@ -51,7 +54,6 @@
 @ DMA
 .equ  DMA1_BASE,          0x40026000
 .equ  DMA2_BASE,          0x40026400
-
 .equ  DMA_LISR,           0x0
 .equ  DMA_HISR,           0x4
 .equ  DMA_S0CR,           0x10 + 0x18 * 0
@@ -84,6 +86,12 @@
 
 .equ  SYSTICK_RELOAD_1MS,	15999  //1 msec at 16MHz ...  16 000 000 / 500 - 1
 
+.equ  RNG_BASE,           0x50060800
+.equ  RNG_CR,             0
+.equ  RNG_SR,             0x4
+.equ  RNG_DR,             0x8
+
+
 .section .rodata
 ROWS: .byte 1, 2, 4, 8, 16, 32, 64, 128
 
@@ -91,13 +99,8 @@ ROWS: .byte 1, 2, 4, 8, 16, 32, 64, 128
 .section .bss
 JOYSTICK_POS: .space 4
 
-/*
-SNAKE_POS is really just an implicit linked list,
- so we also need a "first" variable and a next field...
-*/
 SNAKE_POS: .space 128 @(8x8 x HWORD)
-@ SNAKE_POS_NEXT: .space 64 @ Only need offset from SNAKE_POS base so a byte for each is enough
-@ SNAKE_POS_FIRST: .space 1
+PIXEL_DATA: .space 8 @ Image that will be drawn on the screen
 
 SNAKE_LENGTH: .space 1
 DIRECTION: .space 1
@@ -507,6 +510,7 @@ _start:
   bl dma2_joystick_config
   bl start_adc1
 
+  bl init_rng
   bl configure_matrix
   bl init_snake
 
@@ -519,25 +523,26 @@ _start:
   mov r1, #0
   strb r1, [r2]
 
-  @ @ Initialize first and next for SNAKE_POS
-  @ ldr r5, =SNAKE_POS_NEXT
-  @ ldr r4, =SNAKE_POS_FIRST
-  @ mov r6, #0
-  @ strb r6, [r4]
-  @ add r6, #1
-  @ strb r6, [r5], #1
-  @ @ End of list
-  @ mov r6, #-1
-  @ strb r6, [r5]
-
-
 main:
   bl update_direction
   bl update_snake
   bl render
   mov r0, #200
   bl delay
+
+  bl place_food
+  
   b main
+
+place_food:
+  push { r5, r6, lr }
+  ldr r5, =RNG_BASE
+  check_rng_ready:
+    ldr r6, [r5, #RNG_SR]
+    cmp r6, #1
+    bne check_rng_ready
+  ldr r6, [r5, #RNG_DR]
+  pop { r5, r6, pc }
 
 update_snake:
   push { r4, r5, r6, lr }
@@ -560,15 +565,14 @@ update_snake:
     ldr r3, =SNAKE_LENGTH
     ldrb r3, [r3]
     @ Multiply length by 2 because of HWROD
-    mov r1, #2
-    sub r3, #1
-    mul r3, r1
+    @ sub r3, #1
+    add r3, r3, r3
     sub r3, #2
     move_snake_loop:
       ldrh r2, [r4, r3]
       add r3, #2
       strh r2, [r4, r3]
-      sub r3, #4
+      subs r3, #4
       cmp r3, #-2
       bne move_snake_loop
       strh r0, [r4]
@@ -586,10 +590,10 @@ move_up:
   @ F00 -> and row
   @ FF -> and col
   and r1, r0, #0xFF
-  mov r1, r1, lsl 1
-  cmp r1, #256
+  mov r1, r1, lsr 1
+  cmp r1, #0
   it eq
-  moveq r1, #1
+  moveq r1, #128
   and r0, #0xF00
   eor r0, r1
   b move_snake
@@ -597,13 +601,18 @@ move_right:
   add r0, 0x100
   cmp r0, #0x900
   it gt
-  movgt r0, #0x100
+  subgt r0, #0x800
   b move_snake
 move_down:
-  sub r0, 0x100
-  cmp r0, #9
-  it lt
-  addlt r0, #0x800
+  @ F00 -> and row
+  @ FF -> and col
+  and r1, r0, #0xFF
+  mov r1, r1, lsl 1
+  cmp r1, #256
+  it eq
+  moveq r1, #1
+  and r0, #0xF00
+  eor r0, r1
   b move_snake
 
 update_direction:
@@ -617,45 +626,80 @@ update_direction:
   bge check_y @ Logical X axis
 
   check_x:
-    ldrh r5, [r6, #2]
-    cmp r5, #600 @ Joystick is pointing down
+    ldrh r5, [r6]
+    cmp r5, #900 @ Joystick is pointing up
     itt gt
-    movgt r2, #3
+    movgt r2, #2
     strbgt r2, [r3]
     
-    cmp r5, #300 @ Joystick is pointing up
+    cmp r5, #200 @ Joystick is pointing down
     itt lt
-    movlt r2, #2
+    movlt r2, #3
     strblt r2, [r3]
     b exit_update_direction
     
   check_y:
-    ldrh r5, [r6]
-    cmp r5, #900 @ Joystick is pointing left
-    itt gt
-    movgt r2, #0
-    strbgt r2, [r3]
-    
-    cmp r5, #200 @ Joystick is pointing right
+    ldrh r5, [r6, #2]
+    cmp r5, #200 @ Joystick is pointing left
     itt lt
-    movlt r2, #1
+    movlt r2, #0
     strblt r2, [r3]
+    
+    cmp r5, #900 @ Joystick is pointing right
+    itt gt
+    movgt r2, #1
+    strbgt r2, [r3]
 
   exit_update_direction:
   pop { r2, r3, r4, r5, r6, pc }
 
+update_pixel_data:
+  push { r0, r1, r2, r3, r4, r5, r6, lr }
+  ldr r5, =PIXEL_DATA
+  @ Clear pixel data
+  mov r6, #0
+  str r6, [r5]
+  str r6, [r5, #4]
+
+  @ Draw snake
+  ldr r4, =SNAKE_LENGTH
+  ldrb r4, [r4]
+  add r4, r4, r4
+  ldr r3, =SNAKE_POS
+  add r4, r4, r3
+  update_snake_pixels_loop:
+    @ Load one snake pixel
+    ldrh r2, [r3], #2
+    @ Find out column of pixel
+    mov r1, r2, lsr #8
+    sub r1, #1
+    @ Extract row data from snake pixel
+    and r2, 0xff
+    @ Orr row data with pixels that are already in row
+    ldrb r0, [r5, r1]
+    orr r0, r2
+    @ Store, loop again till you reach the end of the snake
+    strb r0, [r5, r1]
+    cmp r3, r4
+    bne update_snake_pixels_loop
+
+  @ TODO: Draw food
+
+  pop { r0, r1, r2, r3, r4, r5, r6, pc }
+
+@ Render column by column
 render:
   push { r0, r1, r2, r5, lr }
+  bl update_pixel_data
   bl clear_display
-  mov r1, #0
-  ldr r2, =SNAKE_LENGTH
-  ldrb r2, [r2]
-  ldr r5, =SNAKE_POS
+  mov r3, #0x100
+  ldr r5, =PIXEL_DATA
   render_loop:
-    ldrh r0, [r5], #2
+    ldrb r0, [r5], #1
+    add r0, r0, r3
+    add r3, #0x100
     bl transmit_spi1
-    add r1, #1
-    cmp r1, r2
+    cmp r3, #0x900
     bne render_loop
   pop { r0, r1, r2, r5, pc }
 
@@ -990,3 +1034,41 @@ delay:
         subs r0, r0, 1
         bne LOOPTC
       pop {r5, r6, pc}
+
+init_rng:
+  push { r5, r6, lr }
+  ldr r5, =RCC_BASE
+  @ PLL config RNG_OUT = ((PLL_IN -> 16mhz) * (PLLN/PLLM)) / PLLQ = 48mhz
+  @ set pllm as 2 
+  mov r6, #2
+  @ Set PLLN as 12
+  orr r6, #(12<<6)
+  @ Set PLLQ as 2
+  orr r6, #(2<<24)
+  str r6, [r5, #RCC_PLLCFGR]
+
+  ldr r6, [r5, #RCC_AHB2ENR]
+  orr r6, #(1<<6)
+  str r6, [r5, #RCC_AHB2ENR]
+
+  @ Enable PLL
+  ldr r6, [r5, #RCC_CR]
+  orr r6, #(1<<24)
+  str r6, [r5, #RCC_CR]
+
+  ldr r5, =RNG_BASE
+  @ Turn off rgn, reset SR
+  mov r6, #0
+  str r6, [r5, #RNG_CR]
+  str r6, [r5, #RNG_SR]
+  @ Start RNG
+  mov r6, #4
+  str r6, [r5, #RNG_CR]
+
+  @ Wait for first number and read it
+  wait_first_rng:
+    ldr r6, [r5, #RNG_SR]
+    tst r6, #1
+    beq wait_first_rng
+  ldr r6, [r5, #RNG_DR]
+  pop { r5, r6, pc }
