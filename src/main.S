@@ -110,6 +110,8 @@ DIRECTION: .space 1
 2 -> up
 3 -> down
 */
+
+FOOD_POS: .space 2
 .section .text
 
 vector_table:
@@ -513,10 +515,7 @@ _start:
   bl init_rng
   bl configure_matrix
   bl init_snake
-
-  ldr r2, =SNAKE_LENGTH
-  mov r1, #3
-  strb r1, [r2]
+  bl place_food
 
   @ For some reason .space doesn't initialize to 0...
   ldr r2, =DIRECTION
@@ -527,22 +526,70 @@ main:
   bl update_direction
   bl update_snake
   bl render
-  mov r0, #200
+  mov r0, #300
   bl delay
-
-  bl place_food
-  
   b main
 
+eat_food:
+  push { r5, r6, lr }
+  ldr r5, =SNAKE_LENGTH
+  ldrb r6, [r5]
+  add r6, #1
+  strb r6, [r5]
+  bl place_food
+  pop { r5, r6, pc }
 place_food:
   push { r5, r6, lr }
+  generate_food_position:
+    @ Generate column
+    bl fetch_random_number
+    @ Get 3 MS-bits
+    mov r2, r1, lsr 29
+    @ Add one because columns start from 0x100
+    add r2, #1
+    @ Shift to column position
+    mov r2, r2, lsl 8
+    @ Generate row
+    bl fetch_random_number
+    @ Get 3 MS-bits
+    mov r3, r1, lsr 29
+    mov r4, #1
+    lsl r4, r3
+    @ Create position in r2
+    orr r2, r2, r4
+    b check_food_in_snake
+
+  spawn_food:
+    ldr r5, =FOOD_POS
+    strh r2, [r5]
+  pop { r5, r6, pc }
+
+@ Pass in food position through r2
+check_food_in_snake:
+  ldr r5, =SNAKE_POS
+  ldr r4, =SNAKE_LENGTH
+  ldrb r4, [r4]
+
+  check_food_in_snake_loop:
+    ldrh r3, [r5], #2
+    cmp r3, r2
+    beq generate_food_position
+    sub r4, #1
+    cmp r4, #0
+    bne check_food_in_snake_loop
+    b spawn_food
+  
+
+@ returns random number in r1
+fetch_random_number:
+  push {r5, r6, lr}
   ldr r5, =RNG_BASE
   check_rng_ready:
     ldr r6, [r5, #RNG_SR]
-    cmp r6, #1
-    bne check_rng_ready
-  ldr r6, [r5, #RNG_DR]
-  pop { r5, r6, pc }
+    tst r6, #1
+    beq check_rng_ready
+  ldr r1, [r5, #RNG_DR]
+  pop {r5, r6, pc}
 
 update_snake:
   push { r4, r5, r6, lr }
@@ -562,10 +609,14 @@ update_snake:
   @ This one shifts the snake in memory
   move_snake:
     @ Already have SNAKE_POS address in r4
+    ldr r1, =FOOD_POS
+    ldrh r1, [r1]
+    cmp r0, r1
+    it eq
+    bleq eat_food
     ldr r3, =SNAKE_LENGTH
     ldrb r3, [r3]
     @ Multiply length by 2 because of HWROD
-    @ sub r3, #1
     add r3, r3, r3
     sub r3, #2
     move_snake_loop:
@@ -683,8 +734,16 @@ update_pixel_data:
     cmp r3, r4
     bne update_snake_pixels_loop
 
+  cmp r6, #1
+  beq end_update_pixel_data
+  mov r6, #1
   @ TODO: Draw food
-
+  ldr r3, =FOOD_POS
+  mov r4, r3
+  add r4, #2
+  @ Use existing function to orr rows and stuff like that
+  b update_snake_pixels_loop
+  end_update_pixel_data:
   pop { r0, r1, r2, r3, r4, r5, r6, pc }
 
 @ Render column by column
@@ -705,6 +764,11 @@ render:
 
 init_snake:
   push { r5, r6, lr }
+  @ Init length
+  ldr r5, =SNAKE_LENGTH
+  mov r6, #3
+  strb r6, [r5]
+
   ldr r6, =SNAKE_POS
   ldr r5, =COL5+8
   strh r5, [r6], #2
@@ -1047,6 +1111,7 @@ init_rng:
   orr r6, #(2<<24)
   str r6, [r5, #RCC_PLLCFGR]
 
+  @ Enable RNG clock
   ldr r6, [r5, #RCC_AHB2ENR]
   orr r6, #(1<<6)
   str r6, [r5, #RCC_AHB2ENR]
