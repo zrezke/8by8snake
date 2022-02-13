@@ -84,7 +84,7 @@
 .equ  SCS_SYST_RVR,	      0x14	// Value to countdown from
 .equ  SCS_SYST_CVR,	      0x18	// Current value
 
-.equ  SYSTICK_RELOAD_1MS,	15999  //1 msec at 16MHz ...  16 000 000 / 500 - 1
+.equ  SYSTICK_RELOAD_250MS,	3999750  //250 msec at 16MHz ...  16 000 000 / 500 - 1 -> * 250 for 250ms
 
 .equ  RNG_BASE,           0x50060800
 .equ  RNG_CR,             0
@@ -99,9 +99,9 @@ ROWS: .byte 1, 2, 4, 8, 16, 32, 64, 128
 .section .bss
 JOYSTICK_POS: .space 4
 
-SNAKE_POS: .space 128 @(8x8 x HWORD)
 PIXEL_DATA: .space 8 @ Image that will be drawn on the screen
 
+SNAKE_POS: .space 128 @(8x8 x HWORD)
 SNAKE_LENGTH: .space 1
 DIRECTION: .space 1
 /* SNAKE DIRECTION
@@ -110,8 +110,9 @@ DIRECTION: .space 1
 2 -> up
 3 -> down
 */
-
 FOOD_POS: .space 2
+
+UPDATED: .space 1
 .section .text
 
 vector_table:
@@ -254,7 +255,7 @@ vector_table:
   .thumb_set PendSV_Handler,Default_Handler
 
   .weak      SysTick_Handler
-  .thumb_set SysTick_Handler,Default_Handler
+  @ .thumb_set SysTick_Handler,Default_Handler
 
   .weak      WWDG_IRQHandler
   .thumb_set WWDG_IRQHandler,Default_Handler
@@ -523,11 +524,19 @@ _start:
   strb r1, [r2]
 
 main:
+  @ Check if already updated in ongoing game loop and wait until next loop begins
+  ldr r0, =UPDATED
+  ldrb r0, [r0]
+  cmp r0, #1
+  beq main
+
   bl update_direction
   bl update_snake
   bl render
-  mov r0, #300
-  bl delay
+  mov r0, #1
+  ldr r1, =UPDATED
+  strb r0, [r1]
+  @ bl delay
   b main
 
 eat_food:
@@ -646,7 +655,7 @@ move_up:
   it eq
   moveq r1, #128
   and r0, #0xF00
-  eor r0, r1
+  orr r0, r1
   b move_snake
 move_right:
   add r0, 0x100
@@ -950,9 +959,6 @@ enable_adc1:
   ldr r6, [r5, #ADC_CR2]
   orr r6, #1
   str r6, [r5, #ADC_CR2]
-  @ Wait (10ms) to stabilize ADC, it only needs ~10micro s but whatever
-  mov r0, #10
-  bl delay
   pop { r5, r6, pc }
 
 init_adc1:
@@ -1029,6 +1035,17 @@ init_adc1:
 @   mov r2, #10
 @   pop { r5, r6, pc }
 
+.global SysTick_Handler
+.type SysTick_Handler, %function
+
+SysTick_Handler:
+  push { r5, r6, lr }
+  @ Reset UPDATED
+  ldr r5, =UPDATED
+  mov r6, #0
+  strb r6, [r5]
+  pop { r5, r6, pc }
+
 Default_Handler:
 Infinite_Loop:
   b  Infinite_Loop
@@ -1070,27 +1087,32 @@ init_tc:
   push {r5, r6, lr}
 	ldr r6, =SCS
 
-	ldr r5, =SYSTICK_RELOAD_1MS
+	ldr r5, =SYSTICK_RELOAD_250MS
 	str r5, [r6, #SCS_SYST_RVR]
 
-	ldr r5, =0
+	mov r5, #0
 	str r5, [r6, #SCS_SYST_CVR]
-
-	ldr r5, =5
+  
+  @ Enable counter
+	orr r5, #1
+  @ Enable interrupt
+  orr r5, #2
+  @ Processor clock as clock source
+  orr r5, #4
 	str r5, [r6, #SCS_SYST_CSR]
 
   pop {r5, r6, pc}
 
-delay:
-    push {r5, r6, lr}
-    ldr r5, =SCS
-  LOOPTC:	ldr r6, [r5, #SCS_SYST_CSR]
-      tst r6, #0x10000
-      beq LOOPTC
+@ delay:
+@     push {r5, r6, lr}
+@     ldr r5, =SCS
+@   LOOPTC:	ldr r6, [r5, #SCS_SYST_CSR]
+@       tst r6, #0x10000
+@       beq LOOPTC
 
-        subs r0, r0, 1
-        bne LOOPTC
-      pop {r5, r6, pc}
+@         subs r0, r0, 1
+@         bne LOOPTC
+@       pop {r5, r6, pc}
 
 init_rng:
   push { r5, r6, lr }
