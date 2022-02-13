@@ -504,7 +504,7 @@ _start:
   bl init_io
   bl init_spi1
   bl init_tc
- 
+
   bl init_adc1
   bl enable_adc1
 
@@ -539,7 +539,7 @@ eat_food:
   bl place_food
   pop { r5, r6, pc }
 place_food:
-  push { r5, r6, lr }
+  push { r1, r2, r3, r4, r5, r6, lr }
   generate_food_position:
     @ Generate column
     bl fetch_random_number
@@ -562,7 +562,7 @@ place_food:
   spawn_food:
     ldr r5, =FOOD_POS
     strh r2, [r5]
-  pop { r5, r6, pc }
+  pop { r1, r2, r3, r4, r5, r6, pc }
 
 @ Pass in food position through r2
 check_food_in_snake:
@@ -755,9 +755,9 @@ render:
   ldr r5, =PIXEL_DATA
   render_loop:
     ldrb r0, [r5], #1
-    add r0, r0, r3
-    add r3, #0x100
+    orr r0, r3
     bl transmit_spi1
+    add r3, #0x100
     cmp r3, #0x900
     bne render_loop
   pop { r0, r1, r2, r5, pc }
@@ -785,7 +785,7 @@ clear_display:
   ldr r0, =COL0
   clear_display_loop:
     bl transmit_spi1
-    add r0, #256
+    add r0, #0x100
     cmp r0, #0x900
     bne clear_display_loop
 
@@ -823,16 +823,8 @@ transmit_spi1:
   str r6, [r5, #GPIO_ODR]
 
   ldr r5, =SPI1_BASE
-  ldr r6, [r5]
-  orr r6, #(1<<6)
-  str r6, [r5]
-
-  transmit_spi1_loop:
-    ldr r6, [r5, #SPI_SR]
-    tst r6, #2
-    beq transmit_spi1_loop
-    @ Transmit contents of r0
-    str r0, [r5, #SPI_DR]
+  @ Transmit contents of r0
+  str r0, [r5, #SPI_DR]
 
   wait_txe_spi1:
     ldr r6, [r5, #SPI_SR]
@@ -866,14 +858,15 @@ init_spi1:
   str r6, [r5]
   
   mov r6, #0b00 @ CPOL,CPHA
-  orr r6, #(3<<3) @ BR /16
+  orr r6, #(1<<14) @ BIDIOE
+  orr r6, #(1<<2) @ MSTR
   orr r6, #(0b11<<8) @ SSI, SSM
   orr r6, #(1<<11) @ DFF
-  orr r6, #(1<<14) @ BIDIOE
   str r6, [r5]
 
+  @ Enable SPI
   ldr r6, [r5]
-  orr r6, #(0b10001<<2) @mstr and spe
+  orr r6, #(1<<6) @ SPE
   str r6, [r5]
 
   pop { r5, r6, pc }
