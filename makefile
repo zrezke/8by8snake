@@ -1,5 +1,5 @@
-TARGET = main
-SRCS = ./src/main.S
+TARGET = ./out/main
+SRCS = ./src/main.s
 
 OBJS =  $(addsuffix .o, $(basename $(SRCS)))
 INCLUDES = -I.
@@ -50,18 +50,22 @@ endif
 all: clean $(SRCS) build size
 	@echo "Successfully finished..."
 
-build: $(TARGET).elf $(TARGET).hex $(TARGET).bin $(TARGET).lst
+build: out $(TARGET).elf $(TARGET).hex $(TARGET).bin $(TARGET).lst
 
 $(TARGET).elf: $(OBJS)
-	@$(CC) $(LDFLAGS) $(OBJS) -o $@
+	@$(CC) $(LDFLAGS) ./out/$(notdir $(basename $(OBJS))).o -o $@
+
+out:
+	@echo Creating out directory...
+	@mkdir out
 
 %.o: %.c
 	@echo "Building" $<
-	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+	@$(CC) $(CFLAGS) $(INCLUDES) -c $< -o out/$(notdir $@)
 
 %.o: %.s
 	@echo "Building" $<
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) -c $< -o out/$(notdir $@)
 
 %.hex: %.elf
 	@$(OBJCOPY) -O ihex $< $@
