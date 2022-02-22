@@ -3,7 +3,7 @@
 .cpu cortex-m4
 
 //.arch armv7e-m  
-@RCC
+//RCC
 .equ  RCC_BASE,           0x40023800
 .equ  RCC_CR,             0x00
 .equ  RCC_AHB1ENR,        0x30
@@ -11,10 +11,10 @@
 .equ  RCC_APB2ENR,        0x44
 .equ  RCC_PLLCFGR,        0x4
 
-@ SPI1
+// SPI1
 .equ  SPI1_BASE,          0x40013000
 
-@ SPI register offsets
+// SPI register offsets
 .equ  SPI_CR2,            0x4
 .equ  SPI_SR,             0x8
 .equ  SPI_DR,             0xC
@@ -24,17 +24,17 @@
 .equ  SPI_I2SCFGR,        0x1C
 .equ  SPI_I2SPR,          0x20
 
-@ SPI_CR1 config
+// SPI_CR1 config
 .equ  SPI_CR1_CFG,        0x4844
 
-@ GPIOA
+// GPIOA
 .equ  GPIOA_BASE,         0x40020000
 .equ  GPIO_ODR,           0x14
 .equ  GPIO_BSRR,          0x18
 .equ  GPIO_AFRL,          0x20
 .equ  GPIO_AFRH,          0x24
 
-@ ADC
+// ADC
 .equ  ADC1_BASE,          0x40012000
 .equ  ADC2_BASE,          0x40012100
 .equ  ADC3_BASE,          0x40012200
@@ -51,7 +51,7 @@
 .equ  ADC_SMPR2,          0x10
 .equ  ADC_CCR,            0x04
 
-@ DMA
+// DMA
 .equ  DMA1_BASE,          0x40026000
 .equ  DMA2_BASE,          0x40026400
 .equ  DMA_LISR,           0x0
@@ -84,7 +84,7 @@
 .equ  SCS_SYST_RVR,	      0x14	// Value to countdown from
 .equ  SCS_SYST_CVR,	      0x18	// Current value
 
-.equ  SYSTICK_RELOAD_250MS,	3999750  //250 msec at 16MHz ...  16 000 000 / 500 - 1 -> * 250 for 250ms
+.equ  SYSTICK_RELOAD_200MS,	3199999  //200 ms at 16MHz; (16Mhz/1000 * 200)-1
 
 .equ  RNG_BASE,           0x50060800
 .equ  RNG_CR,             0
@@ -99,9 +99,9 @@ ROWS: .byte 1, 2, 4, 8, 16, 32, 64, 128
 .section .bss
 JOYSTICK_POS: .space 4
 
-PIXEL_DATA: .space 8 @ Image that will be drawn on the screen
+PIXEL_DATA: .space 8 // Image that will be drawn on the screen
 
-SNAKE_POS: .space 128 @(8x8 x HWORD)
+SNAKE_POS: .space 128 //(8x8 x HWORD)
 SNAKE_LENGTH: .space 1
 DIRECTION: .space 1
 /* SNAKE DIRECTION
@@ -255,7 +255,7 @@ vector_table:
   .thumb_set PendSV_Handler,Default_Handler
 
   .weak      SysTick_Handler
-  @ .thumb_set SysTick_Handler,Default_Handler
+  // .thumb_set SysTick_Handler,Default_Handler
 
   .weak      WWDG_IRQHandler
   .thumb_set WWDG_IRQHandler,Default_Handler
@@ -507,10 +507,8 @@ _start:
   bl init_tc
 
   bl init_adc1
-  bl enable_adc1
 
   bl init_dma2
-  bl dma2_joystick_config
   bl start_adc1
 
   bl init_rng
@@ -518,26 +516,20 @@ _start:
   bl init_snake
   bl place_food
 
-  @ For some reason .space doesn't initialize to 0...
-  ldr r2, =DIRECTION
-  mov r1, #0
-  strb r1, [r2]
-
-main:
-  @ Check if already updated in ongoing game loop and wait until next loop begins
+game_loop:
+  // Check if already updated in ongoing game loop and wait until next loop begins
   ldr r0, =UPDATED
   ldrb r0, [r0]
   cmp r0, #1
-  beq main
+  beq game_loop
 
   bl update_direction
   bl update_snake
   bl render
-  mov r0, #1
   ldr r1, =UPDATED
+  mov r0, #1
   strb r0, [r1]
-  @ bl delay
-  b main
+  b game_loop
 
 eat_food:
   push { r5, r6, lr }
@@ -550,21 +542,21 @@ eat_food:
 place_food:
   push { r1, r2, r3, r4, r5, r6, lr }
   generate_food_position:
-    @ Generate column
+    // Generate column
     bl fetch_random_number
-    @ Get 3 MS-bits
+    // Get 3 MS-bits
     mov r2, r1, lsr 29
-    @ Add one because columns start from 0x100
+    // Add one because columns start from 0x100
     add r2, #1
-    @ Shift to column position
+    // Shift to column position
     mov r2, r2, lsl 8
-    @ Generate row
+    // Generate row
     bl fetch_random_number
-    @ Get 3 MS-bits
+    // Get 3 MS-bits
     mov r3, r1, lsr 29
     mov r4, #1
     lsl r4, r3
-    @ Create position in r2
+    // Create position in r2
     orr r2, r2, r4
     b check_food_in_snake
 
@@ -573,7 +565,7 @@ place_food:
     strh r2, [r5]
   pop { r1, r2, r3, r4, r5, r6, pc }
 
-@ Pass in food position through r2
+// Pass in food position through r2
 check_food_in_snake:
   ldr r5, =SNAKE_POS
   ldr r4, =SNAKE_LENGTH
@@ -589,7 +581,7 @@ check_food_in_snake:
     b spawn_food
   
 
-@ returns random number in r1
+// returns random number in r1
 fetch_random_number:
   push {r5, r6, lr}
   ldr r5, =RNG_BASE
@@ -602,8 +594,10 @@ fetch_random_number:
 
 update_snake:
   push { r4, r5, r6, lr }
+  // Load head position into r0, because move_{left,right...} functions expect it in r0
   ldr r4, =SNAKE_POS
   ldrh r0, [r4]
+  // Load direction and jump into the appropriate function
   ldr r5, =DIRECTION
   ldrb r6, [r5]
   cmp r6, #0
@@ -615,40 +609,52 @@ update_snake:
   cmp r6, #3
   beq move_down
 
-  @ This one shifts the snake in memory
+  // Shift the snake in memory
   move_snake:
-    @ Already have SNAKE_POS address in r4
+    // Already have SNAKE_POS address in r4
     ldr r1, =FOOD_POS
     ldrh r1, [r1]
     cmp r0, r1
     it eq
     bleq eat_food
+    // Already have SNAKE_POS address in r4
     ldr r3, =SNAKE_LENGTH
     ldrb r3, [r3]
-    @ Multiply length by 2 because of HWROD
+    // Multiply length by 2 because of HWROD
     add r3, r3, r3
     sub r3, #2
     move_snake_loop:
       ldrh r2, [r4, r3]
+      // Reset the game if the new head pos is in it's body
+      cmp r2, r0
+      beq reset_game
       add r3, #2
       strh r2, [r4, r3]
       subs r3, #4
       cmp r3, #-2
       bne move_snake_loop
       strh r0, [r4]
-
   pop { r4, r5, r6, pc }
 
-@ Supply with current head position in r0
+reset_game:
+  // Reinitialize snake to 3 pixels
+  bl init_snake
+  // Replace food, in case it was placed where the snake is after init_snake
+  bl place_food
+  // Continue game
+  b game_loop  
+
+
+// Supply with current head position in r0
 move_left:
   sub r0, 0x100
-  cmp r0, #9
+  cmp r0, #0x100
   it lt
   addlt r0, #0x800
   b move_snake
 move_up:
-  @ F00 -> and row
-  @ FF -> and col
+  // F00 -> and row
+  // FF -> and col
   and r1, r0, #0xFF
   mov r1, r1, lsr 1
   cmp r1, #0
@@ -664,8 +670,8 @@ move_right:
   subgt r0, #0x800
   b move_snake
 move_down:
-  @ F00 -> and row
-  @ FF -> and col
+  // F00 -> and row
+  // FF -> and col
   and r1, r0, #0xFF
   mov r1, r1, lsl 1
   cmp r1, #256
@@ -682,33 +688,33 @@ update_direction:
   ldr r3, =DIRECTION
   ldrb r2, [r3]
   cmp r2, #2
-  blt check_x @ Logical Y axis
-  bge check_y @ Logical X axis
+  blt check_y
+  bge check_x
 
   check_x:
     ldrh r5, [r6]
-    cmp r5, #900 @ Joystick is pointing up
+    cmp r5, #800 // Joystick is pointing left
     itt gt
-    movgt r2, #2
+    movgt r2, #0
     strbgt r2, [r3]
     
-    cmp r5, #200 @ Joystick is pointing down
+    cmp r5, #200 // Joystick is pointing right
     itt lt
-    movlt r2, #3
+    movlt r2, #1
     strblt r2, [r3]
     b exit_update_direction
     
   check_y:
     ldrh r5, [r6, #2]
-    cmp r5, #200 @ Joystick is pointing left
-    itt lt
-    movlt r2, #0
-    strblt r2, [r3]
-    
-    cmp r5, #900 @ Joystick is pointing right
+    cmp r5, #800 // Joystick is pointing up
     itt gt
-    movgt r2, #1
+    movgt r2, #2
     strbgt r2, [r3]
+    
+    cmp r5, #200 // Joystick is pointing down
+    itt lt
+    movlt r2, #3
+    strblt r2, [r3]
 
   exit_update_direction:
   pop { r2, r3, r4, r5, r6, pc }
@@ -716,29 +722,29 @@ update_direction:
 update_pixel_data:
   push { r0, r1, r2, r3, r4, r5, r6, lr }
   ldr r5, =PIXEL_DATA
-  @ Clear pixel data
+  // Clear pixel data
   mov r6, #0
   str r6, [r5]
   str r6, [r5, #4]
 
-  @ Draw snake
+  // Draw snake
   ldr r4, =SNAKE_LENGTH
   ldrb r4, [r4]
   add r4, r4, r4
   ldr r3, =SNAKE_POS
   add r4, r4, r3
   update_snake_pixels_loop:
-    @ Load one snake pixel
+    // Load one snake pixel
     ldrh r2, [r3], #2
-    @ Find out column of pixel
+    // Find out column of pixel
     mov r1, r2, lsr #8
     sub r1, #1
-    @ Extract row data from snake pixel
+    // Extract row data from snake pixel
     and r2, 0xff
-    @ Orr row data with pixels that are already in row
+    // Orr row data with pixels that are already in same column
     ldrb r0, [r5, r1]
     orr r0, r2
-    @ Store, loop again till you reach the end of the snake
+    // Store, loop again till you reach the end of the snake
     strb r0, [r5, r1]
     cmp r3, r4
     bne update_snake_pixels_loop
@@ -746,16 +752,16 @@ update_pixel_data:
   cmp r6, #1
   beq end_update_pixel_data
   mov r6, #1
-  @ TODO: Draw food
+  // TODO: Draw food
   ldr r3, =FOOD_POS
   mov r4, r3
   add r4, #2
-  @ Use existing function to orr rows and stuff like that
+  // Use existing function to orr rows and stuff like that
   b update_snake_pixels_loop
   end_update_pixel_data:
   pop { r0, r1, r2, r3, r4, r5, r6, pc }
 
-@ Render column by column
+// Render column by column
 render:
   push { r0, r1, r2, r5, lr }
   bl update_pixel_data
@@ -773,9 +779,14 @@ render:
 
 init_snake:
   push { r5, r6, lr }
-  @ Init length
+  // Init length
   ldr r5, =SNAKE_LENGTH
   mov r6, #3
+  strb r6, [r5]
+
+  // Init direction
+  ldr r5, =DIRECTION
+  mov r6, #0
   strb r6, [r5]
 
   ldr r6, =SNAKE_POS
@@ -823,7 +834,7 @@ configure_matrix:
   bl clear_display
   pop { r0, pc }
 
-@ pass data through r0
+// pass data through r0
 transmit_spi1:
   push { r5, r6, lr }
   ldr r5, =GPIOA_BASE
@@ -832,7 +843,7 @@ transmit_spi1:
   str r6, [r5, #GPIO_ODR]
 
   ldr r5, =SPI1_BASE
-  @ Transmit contents of r0
+  // Transmit contents of r0
   str r0, [r5, #SPI_DR]
 
   wait_txe_spi1:
@@ -851,14 +862,14 @@ transmit_spi1:
   pop { r5, r6, pc }
 
 
-@ pass in baud rate through r5
+// pass in baud rate through r5
 init_spi1:
   push { r5, r6, lr }
 
-  @ ENABLE Clock
+  // ENABLE Clock
   ldr r5, =RCC_BASE
   ldr r6, [r5, #RCC_APB2ENR]
-  @ Bit 12: SPI1 clock enable
+  // Bit 12: SPI1 clock enable
   orr r6, #(1 << 12)
   str r6, [r5, #RCC_APB2ENR]
 
@@ -866,24 +877,62 @@ init_spi1:
   mov r6, 0
   str r6, [r5]
   
-  mov r6, #0b00 @ CPOL,CPHA
-  orr r6, #(1<<14) @ BIDIOE
-  orr r6, #(1<<2) @ MSTR
-  orr r6, #(0b11<<8) @ SSI, SSM
-  orr r6, #(1<<11) @ DFF
+  mov r6, #0b00 // CPOL,CPHA
+  orr r6, #(1<<14) // BIDIOE
+  orr r6, #(1<<2) // MSTR
+  orr r6, #(0b11<<8) // SSI, SSM
+  orr r6, #(1<<11) // DFF
   str r6, [r5]
 
-  @ Enable SPI
+  // Enable SPI
   ldr r6, [r5]
-  orr r6, #(1<<6) @ SPE
+  orr r6, #(1<<6) // SPE
   str r6, [r5]
 
   pop { r5, r6, pc }
 
-dma2_joystick_config:
+init_dma2:
   push { r5, r6, lr }
+  // Enable DMA2 clock
+  ldr r5, =RCC_BASE
+  ldr r6, [r5, #RCC_AHB1ENR]
+  orr r6, #(1<<22)
+  str r6, [r5, #RCC_AHB1ENR]
+  
   ldr r5, =DMA2_BASE
-  @ N of data items to transfer: 2
+  mov r6, #0
+  str r6, [r5, #DMA_S0CR]
+
+  wait_dma2_s0_reset:
+    ldr r6, [r5, #DMA_S0CR]
+    tst r6, #1
+    bne wait_dma2_s0_reset
+  
+  mov r6, #0
+  str r6, [r5, #DMA_LISR]
+  str r6, [r5, #DMA_HISR]
+
+  // CHSEL: 0, DIR: Peripheral to memmory, 
+  mov r6, #0
+ 
+  // PSIZE, MSIZE hword
+  orr r6, #(0b01<<11)
+  orr r6, #(0b01<<13)
+
+  // Priority very high
+  orr r6, #(0b11 << 16)
+
+  // CIRC MODE ENABLE
+  orr r6, #(1<<8)
+
+  // TCIE = 1
+  orr r6, #(1<<4)
+
+  // MEMORY INC
+  orr r6, #(1<<10)
+  str r6, [r5, #DMA_S0CR]
+
+  // N of data items to transfer: 2
   mov r6, #2
   str r6, [r5, #DMA_S0_NDTR]
 
@@ -894,51 +943,9 @@ dma2_joystick_config:
   ldr r6, =JOYSTICK_POS
   str r6, [r5, #DMA_S0M0AR]
 
-  @ Enable stream
+  // Enable stream
   ldr r6, [r5, #DMA_S0CR]
   orr r6, #1
-  str r6, [r5, #DMA_S0CR]
-  pop { r5, r6, pc }
-
-init_dma2:
-  push { r5, r6, lr }
-  @ Enable DMA2 clock
-  ldr r5, =RCC_BASE
-  ldr r6, [r5, #RCC_AHB1ENR]
-  orr r6, #(1<<22)
-  str r6, [r5, #RCC_AHB1ENR]
-
-  ldr r5, =DMA2_BASE
-  mov r6, #0
-  str r6, [r5, #DMA_S0CR]
-  wait_dma2_reset:
-    ldr r6, [r5, #DMA_S0CR]
-    tst r6, #1
-    bne wait_dma2_reset
-  
-  mov r6, #0
-  str r6, [r5, #DMA_LISR]
-  str r6, [r5, #DMA_HISR]
-
-  @ Channel 0, Stream 0
-  @ CHSEL: 0, DIR: Peripheral to memmory, 
-  mov r6, #0
- 
-  @ PSIZE, MSIZE hword
-  orr r6, #(0b01<<11)
-  orr r6, #(0b01<<13)
-
-  @ Priority very high
-  orr r6, #(0b11 << 16)
-
-  @ CIRC MODE ENABLE
-  orr r6, #(1<<8)
-
-  @ TCIE = 1
-  orr r6, #(1<<4)
-
-  @ MEMORY INC
-  orr r6, #(1<<10)
   str r6, [r5, #DMA_S0CR]
   pop { r5, r6, pc }
 
@@ -947,23 +954,15 @@ start_adc1:
   ldr r5, =ADC1_BASE
   mov r6, #0
   str r6, [r5, #ADC_SR]
-  @ START
+  // START
   ldr r6, [r5, #ADC_CR2]
   orr r6, #(1<<30)
   str r6, [r5, #ADC_CR2]
   pop { r5, r6, pc }
 
-enable_adc1:
-  push { r5, r6, lr }
-  ldr r5, =ADC1_BASE
-  ldr r6, [r5, #ADC_CR2]
-  orr r6, #1
-  str r6, [r5, #ADC_CR2]
-  pop { r5, r6, pc }
-
 init_adc1:
   push { r5, r6, lr }
-  @ Enable ADC1 clock
+  // Enable ADC1 clock
   ldr r5, =RCC_BASE
   ldr r6, [r5, #RCC_APB2ENR]
   orr r6, #(1<<8)
@@ -980,67 +979,53 @@ init_adc1:
   str r6, [r5, #ADC_SQR3]
   str r6, [r5, #ADC_CCR]
   
-  @ CLK prescaler
-  @ orr r6, #(2<<16)
-  @ str r6, [r5, #ADC_CCR]
-  
-  @ CR1 settings
-  @ Set RES to 10bits
+  // CR1 settings
+  // Set RES to 10bits
   mov r6, #(0b01<<24)
 
-  @ SCAN MODE
+  // SCAN MODE
   orr r6, #(1<<8)
-  @ OVRIE enable
-  @ orr r6, #(1<<26)
 
-  @ EOCIE
-  @ orr r6, #(1<<5)
+  // EOCIE
+  // orr r6, #(1<<5)
   str r6, [r5, #ADC_CR1]
 
-  @CR2 settings
-  @ set CONT mode
+  //CR2 settings
+  // set CONT mode
   mov r6, #0b10
-  @ EOC after each conversion
+  // EOC after each conversion
   orr r6, #(1<<10)
-  @ Enable DMA, DDS
+  // Enable DMA, DDS
   orr r6, #(0b11<<8)
   str r6, [r5, #ADC_CR2]
 
-  @ Two conversions
+  // Two conversions
   mov r6, #(1<<20)
   str r6, [r5, #ADC_SQR1]
 
-  @ Select order, PA1, PA2
+  // Select order, PA1, PA2
   mov r6, #1
   orr r6, #(2 << 5)
   str r6, [r5, #ADC_SQR3]
 
-  @ SAMPLE TIME
+  // SAMPLE TIME
   mov r6, #9
   str r6, [r5, #ADC_SMPR2]
 
+  // Enable ADC1
+  ldr r6, [r5, #ADC_CR2]
+  orr r6, #1
+  str r6, [r5, #ADC_CR2]
+
   pop { r5, r6, pc }
 
-@ .global DMA2_Stream0_IRQHandler
-@ .type  DMA2_Stream0_IRQHandler, %function
-@ DMA2_Stream0_IRQHandler:
-@   push { r5, r6, lr }
-@   mov r1, #10
-@   pop { r5, r6, pc }
-
-@ .global ADC_IRQHandler
-@ .type  ADC_IRQHandler, %function
-@ ADC_IRQHandler:
-@   push { r5, r6, lr }
-@   mov r2, #10
-@   pop { r5, r6, pc }
 
 .global SysTick_Handler
 .type SysTick_Handler, %function
 
 SysTick_Handler:
   push { r5, r6, lr }
-  @ Reset UPDATED
+  // Reset UPDATED
   ldr r5, =UPDATED
   mov r6, #0
   strb r6, [r5]
@@ -1053,25 +1038,25 @@ Infinite_Loop:
 init_io:
   push { r5, r6, lr }
 
-  @ Enable GPIOA clock
+  // Enable GPIOA clock
   ldr r5, =RCC_BASE
   ldr r6, [r5, #RCC_AHB1ENR]
   orr r6, #1
   str r6, [r5, #RCC_AHB1ENR]
 
-  @ GPIOA_MODER  
+  // GPIOA_MODER  
   ldr r5, =GPIOA_BASE
-  @ set pins 1,2 as analog, 4 as regular GPIO; used as -> (SPI1 NSS)
+  // set pins 1,2 as analog, 4 as regular GPIO; used as -> (SPI1 NSS)
   ldr r6, [r5]
   orr r6, #(0b11 << 2)
   orr r6, #(0b11 << 4)
   orr r6, #(0b01 << 8)
-  @ Select alternate function mode (MODR register) on pins 5 (SPI1 SCK) and 7 (SPI1 MOSI)
+  // Select alternate function mode (MODR register) on pins 5 (SPI1 SCK) and 7 (SPI1 MOSI)
   orr r6, #(0b10 << 10)
   orr r6, #(0b10 << 14)
   str r6, [r5]
 
-  @ Set AF5 (SPI1) for pins 5 and 7
+  // Set AF5 (SPI1) for pins 5 and 7
   ldr r6, [r5, #GPIO_AFRL]
   orr r6, r6, #(0b101 << 28)
   orr r6, r6, #(0b101 << 20)
@@ -1087,65 +1072,65 @@ init_tc:
   push {r5, r6, lr}
 	ldr r6, =SCS
 
-	ldr r5, =SYSTICK_RELOAD_250MS
+	ldr r5, =SYSTICK_RELOAD_200MS
 	str r5, [r6, #SCS_SYST_RVR]
 
 	mov r5, #0
 	str r5, [r6, #SCS_SYST_CVR]
   
-  @ Enable counter
+  // Enable counter
 	orr r5, #1
-  @ Enable interrupt
+  // Enable interrupt
   orr r5, #2
-  @ Processor clock as clock source
+  // Processor clock as clock source
   orr r5, #4
 	str r5, [r6, #SCS_SYST_CSR]
 
   pop {r5, r6, pc}
 
-@ delay:
-@     push {r5, r6, lr}
-@     ldr r5, =SCS
-@   LOOPTC:	ldr r6, [r5, #SCS_SYST_CSR]
-@       tst r6, #0x10000
-@       beq LOOPTC
+// delay:
+//     push {r5, r6, lr}
+//     ldr r5, =SCS
+//   LOOPTC:	ldr r6, [r5, #SCS_SYST_CSR]
+//       tst r6, #0x10000
+//       beq LOOPTC
 
-@         subs r0, r0, 1
-@         bne LOOPTC
-@       pop {r5, r6, pc}
+//         subs r0, r0, 1
+//         bne LOOPTC
+//       pop {r5, r6, pc}
 
 init_rng:
   push { r5, r6, lr }
   ldr r5, =RCC_BASE
-  @ PLL config RNG_OUT = ((PLL_IN -> 16mhz) * (PLLN/PLLM)) / PLLQ = 48mhz
-  @ set pllm as 2 
+  // PLL config RNG_OUT = ((PLL_IN -> 16mhz) * (PLLN/PLLM)) / PLLQ = 48mhz
+  // set pllm as 2 
   mov r6, #2
-  @ Set PLLN as 12
+  // Set PLLN as 12
   orr r6, #(12<<6)
-  @ Set PLLQ as 2
+  // Set PLLQ as 2
   orr r6, #(2<<24)
   str r6, [r5, #RCC_PLLCFGR]
 
-  @ Enable RNG clock
+  // Enable RNG clock
   ldr r6, [r5, #RCC_AHB2ENR]
   orr r6, #(1<<6)
   str r6, [r5, #RCC_AHB2ENR]
 
-  @ Enable PLL
+  // Enable PLL
   ldr r6, [r5, #RCC_CR]
   orr r6, #(1<<24)
   str r6, [r5, #RCC_CR]
 
   ldr r5, =RNG_BASE
-  @ Turn off rgn, reset SR
+  // Turn off rgn, reset SR
   mov r6, #0
   str r6, [r5, #RNG_CR]
   str r6, [r5, #RNG_SR]
-  @ Start RNG
+  // Start RNG
   mov r6, #4
   str r6, [r5, #RNG_CR]
 
-  @ Wait for first number and read it
+  // Wait for first number and read it
   wait_first_rng:
     ldr r6, [r5, #RNG_SR]
     tst r6, #1
