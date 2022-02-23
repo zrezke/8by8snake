@@ -7,3 +7,4 @@ Release/
 .cortex-debug.registers.state.json
 *.log
 out/*
+.DS_Store
