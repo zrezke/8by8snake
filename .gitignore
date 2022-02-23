@@ -8,3 +8,6 @@ Release/
 *.log
 out/*
 .DS_Store
+_site
+_posts
+Gemfile.lock

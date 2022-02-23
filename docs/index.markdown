@@ -1,6 +1,10 @@
-# Snake game on an 8x8 LED matrix using the STM32F4 discovery board.
+---
+title: Snake game on an 8x8 LED matrix using the STM32F4 discovery board.
+---
 
-In this gist we will be implementing a snake game on bare metal. This means we will only use assembly and registers, without any fancy tools such as the CUBEMX :)
+<!-- # Snake game on an 8x8 LED matrix using the STM32F4 discovery board. -->
+
+In this post we will be implementing a snake game on bare metal. This means we will only use assembly and registers, without any fancy tools such as the CUBEMX :)
 
 ## Parts list
 
